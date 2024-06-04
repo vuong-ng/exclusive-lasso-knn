@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import os
+import os # not used so far
 import pandas as pd
 import scipy.io
 from sklearn import linear_model
@@ -11,11 +11,13 @@ from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
 from sklearn.utils.multiclass import unique_labels
 from sklearn.metrics import accuracy_score
+from sklearn.cluster import KMeans
+
 
 class exclusive_lasso:
     def __init__(self, X, y,  groups_vect, lambda_):
-        self.X = X
-        self.y = y
+        self.X = X # predictors pxn matrix
+        self.y = y # test sample pxn_test
         self.groups_vect = groups_vect
         self.lambda_ = lambda_ # cross_validate then pass into the function
 
@@ -30,7 +32,9 @@ class exclusive_lasso:
             integer: residual between X*/alphas and y
         """
         residual = self.y - (self.X @ alphas)
-        return (np.sum(residual ** 2) + self.lambda_ * (np.sum(alphas ** 2))) # Square root of residuals plus the lasso penalty
+        # print(self.groups_vect.shape, "\n", alphas.shape)
+        grouped_alphas = self.groups_vect @ np.absolute((alphas)) 
+        return (np.sum(residual ** 2) + self.lambda_ * (np.sum(grouped_alphas ** 2))) # Square root of residuals plus the lasso penalty
 
     def lasso_optimize(self, x0):
         """argmin on the least squares to find optimal sparse alphas
@@ -42,15 +46,16 @@ class exclusive_lasso:
             optimal alphas (as sklearn object) : nx1 optimal vector of coefficients
         """
         func = lambda x: self.regularized_least_square(x)
+        
         return minimize(func, x0, method='SLSQP')
 
 
 class EkNN_C:
     def __init__(self, X, coefs_vect, x_labels, k):
-        self.coefs_vect = coefs_vect
+        self.coefs_vect = coefs_vect # result from lasso_optimize function
         self.k = k
         self.x_labels = x_labels
-        self.X = X
+        self.X = X # predict = pxn matrix
         
         # generate k largest coeffcients for the model
         coefs = self.coefs_vect
@@ -91,13 +96,12 @@ class EkNN_C:
         
         class_coefs = [] # list of m coeficient vector represent m classes
         for i in range(len(self.x_labels)):
-            class_coefs.append(self.class_coefs_vect( i))
+            class_coefs.append(self.class_coefs_vect(i))
         
-        coefs_l1_norm = [np.linalg.norm(class_coefs[i], ord=1) for i in range(len(self.x_labels))]
-        for i in range(len(self.x_labels)):
-            if np.sum(class_coefs[i]) == max(coefs_l1_norm):
-                return i
-        return 0
+        coefs_sums = [np.sum(class_coefs[i]) for i in range(len(class_coefs))]
+        largest_coefs = max(coefs_sums)
+        
+        return coefs_sums.index(largest_coefs)
             
         
         #calculate L1-norm of coeficient vector
@@ -106,13 +110,13 @@ class EkNN_R:
     def __init__(self, X, y, coefs_vect, x_labels, k):
         self.coefs_vect = coefs_vect
         self.k = k
-        self.x_labels = x_labels
-        self.X = X
-        self.y = y
+        self.x_labels = x_labels # mxn matrix that represent groups of each observation by 0,1
+        self.X = X # predictors matrix pxn 
+        self.y = y # test sample matrix pxn_test
         
         # construct nx1 vector containing k non-zero coeficients
         # which are k largest coefficients
-        # Other coeficients that are not one of the k largest remains 0
+        # Other coefficients that are not one of the k largest remains 0
         coefs = self.coefs_vect
         coefs = coefs.tolist()
         coefs.sort(reverse=True)
@@ -125,24 +129,25 @@ class EkNN_R:
                 
         self.k_largest_coefs_vect  = k_largest_coefs
     
-    def class_coefs_vect(self, label_index, k_largest_coefs):
+    def class_coefs_vect(self, label_index):
         """represent coeficients according to a particular class labels 
 
         Args:
             label_index (_type_): _description_
             k_largest_coefs (_type_): vector containing only k largest optimal coeficients
         """
+        
         c_coefs = np.zeros(self.X.shape[1])
-        for i in range(len(self.x_labels[label_index])):
+        for i in range(self.X.shape[1]): # columns index = index of observations
             if self.x_labels[label_index,i] == 1:
-                c_coefs[i] = k_largest_coefs[i]
+                c_coefs[i] = self.k_largest_coefs_vect[i]
             else:
                 c_coefs[i] = 0
-        return c_coefs
+        return c_coefs # this can just be a list
     
 
     def create_obs_vects(self):
-        """helper method for vector for each training data (each observation)
+        """helper function to generate vector for each training data (each observation)
             to calculate the distance later.
 
         Returns:
@@ -173,13 +178,13 @@ class EkNN_R:
             y to k nearest neighbors
         """
         x_vects = self.create_obs_vects()
-        d_vect = np.zeros(self.X.shape[1])
+        d_vect = np.zeros(self.X.shape[1]) # number of observations
         
         for i in range(self.X.shape[1]):
             if self.k_largest_coefs_vect[i] == 0:
-                d_vect[i] = 0
+                d_vect[i] = 0 # is it safe to set those not k largest to 0
             else: 
-                d_vect[i] = np.linalg.norm(self.y - self.k_largest_coefs_vect[i] * x_vects[i])
+                d_vect[i] = np.linalg.norm(self.y - self.k_largest_coefs_vect[i] * x_vects[i], ord=2)
                 
         return d_vect
     
@@ -213,7 +218,7 @@ class EkNN_R:
         # class_coefs_list = []
         
         for i in range(self.x_labels.shape[0]):
-            class_coefs_mat[i,:] = (self.class_coefs_vect(i, self.k_largest_coefs_vect))
+            class_coefs_mat[i,:] = (self.class_coefs_vect(i))
         
         sum_coefs_weights = class_coefs_mat @ W
         # return W
@@ -229,10 +234,11 @@ class ExclusiveLassoKNNClassifier(BaseEstimator, ClassifierMixin):
         
         # X passed in have nxp dimension
         self.group_vect = self.group_encode(X) 
+        # print ("here: ",self.group_vect.shape)
         self.X = np.transpose(X) # X_train
-        self.x_labels = x_labels # y_train 
+        # self.x_labels = x_labels # y_train 
     
-        class_names = [i+1 for i in range(len(np.unique(x_labels)))]
+        class_names = [i for i in range(len(np.unique(x_labels)))]
         
         self.x_labels = self.label_matrix(class_names, x_labels)
 
@@ -242,28 +248,21 @@ class ExclusiveLassoKNNClassifier(BaseEstimator, ClassifierMixin):
     
     def predict(self, Y):
         # Y test sample
-        preds = []
+        preds = np.zeros(Y.shape[1])
         
         # modify y's shape
-        y_s = np.zeros((Y.shape[1], Y.shape[0]))
-        for i in range(Y.shape[1]):
-            for j in range(Y.shape[0]):
-                y_s[i,j] = Y[j,i]
-        
-        xL2 = np.zeros(self.X.shape[1])
-        for i in range(self.X.shape[1]):
-            if np.random.rand() >= 0.5:
-                xL2[i] = 1
-            else:
-                xL2[i] = 0
-                
+        y_s = np.transpose(Y)
+        # print(self.X.shape)
         for i in range(y_s.shape[0]):
+            # xL2 = np.random.rand((self.X.shape[1]))
+            xL2 = np.linalg.pinv(self.X) @ y_s[i]
             reg = exclusive_lasso(self.X, y_s[i], self.group_vect, self.lambda_)
             coefs = reg.lasso_optimize(xL2).x
+            # print(reg.lasso_optimize(xL2).message)
             knn_R = EkNN_R(self.X, y_s[i], coefs, self.x_labels, self.k)
-            preds.append(knn_R.predict())
+            preds[i]=(knn_R.predict())
 
-        return np.array(preds)
+        return preds
     
     
     def label_matrix(self,label_names:list, labels):
@@ -279,24 +278,38 @@ class ExclusiveLassoKNNClassifier(BaseEstimator, ClassifierMixin):
         return label_mat
     
     
-    def group_encode(self,X):
+    def group_encode(self, X):
         # call before having X
-        n = X.shape[1]
-        group_pop = int(n/self.group_num)
-        group_vect = []
-        start = 0
-        end = group_pop
-        while end <= n:
-            temp = np.zeros(X.shape[1])
-            if end + group_pop > n:
-                temp[start:n] = 1
-                group_vect.append(temp)
-                break
-            else: temp[start:end] = 1
-            start = end
-            end += group_pop
-            group_vect.append(temp)
-        return np.array(group_vect)
+        # n = X.shape[1]
+        # group_pop = int(n/self.group_num)
+        # group_vect = []
+        # start = 0
+        # end = group_pop
+        # while end <= n:
+        #     temp = np.zeros(X.shape[1])
+        #     if end + group_pop > n:
+        #         temp[start:n] = 1
+        #         group_vect.append(temp)
+        #         break
+        #     else: temp[start:end] = 1
+        #     start = end
+        #     end += group_pop
+        #     group_vect.append(temp)
+        # return np.array(group_vect)
+    
+        # 2nd approach perform unsupervised learning
+        kmeans = KMeans(n_clusters=self.group_num, random_state=0, n_init="auto").fit(X)
+        result = kmeans.labels_
+        group_vect = np.zeros((self.group_num, len(result)))
+        for i in range(self.group_num):
+            for j in range(len(result)):
+                if result[j] == i:
+                    # print(result[j],"and ",i )
+                    group_vect[i,j] = 1
+        # print (group_vect.shape)
+        return group_vect
+
+
 
     def score(self, Y, y_labels):
         """
