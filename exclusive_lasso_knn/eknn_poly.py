@@ -268,7 +268,7 @@ class polynomial_EkNN(BaseEstimator, ClassifierMixin):
             coefs = reg.lasso_optimize(x0).x
             # print(reg.lasso_optimize(xL2).message)
             print(coefs)
-            poly_EkNN_R = polynomial_EkNN_R(self.X_train, y_s[i], coefs[0:self.X_train.shape[1]], coefs[self.X_train.shape[1]:], self.y_train, self.k)
+            poly_EkNN_R = polynomial_EkNN_R_classifier(self.X_train, y_s[i], coefs[0:self.X_train.shape[1]], coefs[self.X_train.shape[1]:], self.y_train, self.k)
             preds[i] = poly_EkNN_R.classify()
 
         return preds
