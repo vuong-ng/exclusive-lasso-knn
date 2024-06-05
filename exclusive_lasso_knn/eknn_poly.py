@@ -102,7 +102,7 @@ class polynomial_EkNN_C:
         coefs_sums = [np.sum(class_coefficients_sum[i]) for i in range(len(class_coefficients_sum))]
         return coefs_sums.index(max(coefs_sums))
 
-class polynomial_EkNN_R:
+class polynomial_EkNN_R_classifier:
     def __init__(self, X, y, alphas, betas, x_labels_encode, k):
         self.alphas = alphas 
         self.betas = betas
