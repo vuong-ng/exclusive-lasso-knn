@@ -9,7 +9,7 @@ from sklearn import model_selection
 from scipy.optimize import minimize
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
-from sklearn.utils.multiclass import unique_labels
+from sklearn.utils.multiclass import unique_labels     
 from sklearn.metrics import accuracy_score
 from sklearn.cluster import KMeans
 
@@ -102,7 +102,7 @@ class polynomial_EkNN_C:
         coefs_sums = [np.sum(class_coefficients_sum[i]) for i in range(len(class_coefficients_sum))]
         return coefs_sums.index(max(coefs_sums))
 
-class polynomial_EkNN_R_classifier:
+class polynomial_EkNN_R:
     def __init__(self, X, y, alphas, betas, x_labels_encode, k):
         self.alphas = alphas 
         self.betas = betas
@@ -190,7 +190,7 @@ class polynomial_EkNN_R_classifier:
         return np.where(weights_coefs_product == max(weights_coefs_product))[0][0]
             
 
-class polynomial_EkNN(BaseEstimator, ClassifierMixin):
+class polynomial_EkNN_R_classifier(BaseEstimator, ClassifierMixin):
     def __init__(self, lambda_=1.0,  group_num=1, k=3):
         # self.lambda_1 = lambda_1
         self.lambda_ = lambda_
@@ -268,7 +268,7 @@ class polynomial_EkNN(BaseEstimator, ClassifierMixin):
             coefs = reg.lasso_optimize(x0).x
             # print(reg.lasso_optimize(xL2).message)
             print(coefs)
-            poly_EkNN_R = polynomial_EkNN_R_classifier(self.X_train, y_s[i], coefs[0:self.X_train.shape[1]], coefs[self.X_train.shape[1]:], self.y_train, self.k)
+            poly_EkNN_R = polynomial_EkNN_R(self.X_train, y_s[i], coefs[0:self.X_train.shape[1]], coefs[self.X_train.shape[1]:], self.y_train, self.k)
             preds[i] = poly_EkNN_R.classify()
 
         return preds
