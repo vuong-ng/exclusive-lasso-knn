@@ -186,7 +186,7 @@ class polynomial_EkNN_R:
     def classify(self):
         class_coefs_vect = self.class_coefs_vect()
         weights_coefs_product = class_coefs_vect @ self.weights()
-        print(weights_coefs_product, weights_coefs_product.shape)
+        # print(weights_coefs_product, weights_coefs_product.shape)
         return np.where(weights_coefs_product == max(weights_coefs_product))[0][0]
             
 
@@ -250,7 +250,7 @@ class polynomial_EkNN_R_classifier(BaseEstimator, ClassifierMixin):
         preds = np.zeros(X_test.shape[1]) # number of testing observations
         
         # n = self.X_train.shape[1] # number of training observations
-        print(self.X_train.shape[1], type(self.X_train.shape[1]))
+        # print(self.X_train.shape[1], type(self.X_train.shape[1]))
         
         # reshape test sample Y
         y_s = np.transpose(X_test) # y_s = nxp, y_s[i] = (p,)
@@ -263,11 +263,11 @@ class polynomial_EkNN_R_classifier(BaseEstimator, ClassifierMixin):
             alphas_0 = np.linalg.pinv(self.X_train) @ y_s[i]
             betas_0 = (np.linalg.pinv(self.X_train) ** 2) @ y_s[i]
             x0 = np.concatenate((alphas_0, betas_0), axis=0)
-            print(x0)
+            # print(x0)
             reg = polynomial_reg(self.X_train, y_s[i], self.group_vect, self.lambda_)
             coefs = reg.lasso_optimize(x0).x
             # print(reg.lasso_optimize(xL2).message)
-            print(coefs)
+            # print(coefs)
             poly_EkNN_R = polynomial_EkNN_R(self.X_train, y_s[i], coefs[0:self.X_train.shape[1]], coefs[self.X_train.shape[1]:], self.y_train, self.k)
             preds[i] = poly_EkNN_R.classify()
 
