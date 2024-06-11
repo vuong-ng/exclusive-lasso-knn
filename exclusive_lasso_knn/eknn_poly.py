@@ -20,7 +20,6 @@ class polynomial_reg:
         self.groups_vect = groups_vect
         # self.lambda_1 = lambda_1
         self.lambda_ = lambda_
-        
     def regularized_least_square(self, coefficients):
         
         # coefficients vector is alphas stacked upon betas
