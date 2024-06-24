@@ -18,21 +18,28 @@ class polynomial_reg:
         self.X = X
         self.y = y
         self.groups_vect = groups_vect
-        # self.lambda_1 = lambda_1
         self.lambda_ = lambda_
     def regularized_least_square(self, coefficients):
         
         # coefficients vector is alphas stacked upon betas
         alphas = coefficients[0:self.X.shape[1]]
+        # print("alpha is : ", alphas)
         betas = coefficients[self.X.shape[1]:]
+        # print("beta is : ", betas)
         grouped_alphas = self.groups_vect @ np.absolute(alphas)
         grouped_betas = self.groups_vect @ np.absolute(betas)
-        residual= self.y + self.y**2 - (self.X @ alphas + self.X**2 @ betas)
-        return (np.sum(residual**2) + self.lambda_ * (np.sum(grouped_alphas ** 2)) + self.lambda_ * (np.sum(grouped_betas ** 2)) )
+        print("grouped alpha is : ", grouped_alphas)
+        print("grouped beta is : ", grouped_betas)
+        residual= self.y + self.y**2 - (self.X @ alphas + (self.X**2) @ betas)
+        print("residual is : ", residual)
+        return np.sum(residual**2) + self.lambda_ * (np.sum(grouped_alphas ** 2)) + self.lambda_ * (np.sum(grouped_betas ** 2)) 
     
     def lasso_optimize(self, x0):
         func = lambda stacked_coefficients: self.regularized_least_square(stacked_coefficients)
-        return minimize(func, x0, method='SLSQP')
+        obj = minimize(func, x0, method='Nelder-mead', options={'maxiter': 10000,'maxfev':10000,'xatol': 1e-8, 'disp': True})
+        # obj = minimize(func, x0, method='SLSQP')
+        print(obj.x)
+        return obj
     
 class polynomial_EkNN_C:
     def __init__(self, X, alphas, betas, x_labels_encode, k):
@@ -97,7 +104,6 @@ class polynomial_EkNN_C:
     def classify(self):
         class_coefficients_sum = self.class_coefs_vect()
         
-        # coefficients_sum = class_alphas_vect + class_betas_vect
         coefs_sums = [np.sum(class_coefficients_sum[i]) for i in range(len(class_coefficients_sum))]
         return coefs_sums.index(max(coefs_sums))
 
@@ -111,25 +117,50 @@ class polynomial_EkNN_R:
         self.x_labels_encode = x_labels_encode # 0,1 vector
         
         # generate k largest coefficients for the model
-        sum_coefs = alphas + betas
-        sum_coefs_list = sum_coefs.tolist()
-        sum_coefs_list.sort(reverse=True)
-        max_sum_coefs_list = sum_coefs_list[0:self.k]
         
-        k_largest_sum_coefs = alphas + betas
+        """choose k largest coefficients \alpha + \beta 
+        """
+        # sum_coefs = alphas + betas
+        # sum_coefs_list = sum_coefs.tolist()
+        # sum_coefs_list.sort(reverse=True)
+        # max_sum_coefs_list = sum_coefs_list[0:self.k]
         
-        for j in range(len(sum_coefs_list)):
-            if k_largest_sum_coefs[j] not in max_sum_coefs_list:
-                k_largest_sum_coefs[j] = 0
+        # k_largest_sum_coefs = alphas + betas
         
-        for i in range(len(sum_coefs_list)):
-            if k_largest_sum_coefs[i] == 0:
-                alphas[i] = 0
-                betas[i] = 0
+        # for j in range(len(sum_coefs_list)):
+        #     if k_largest_sum_coefs[j] not in max_sum_coefs_list:
+        #         k_largest_sum_coefs[j] = 0
         
-        self.largest_alphas = alphas
-        self.largest_betas = betas
-        self.k_largest_sum_coefs = k_largest_sum_coefs
+        # for i in range(len(sum_coefs_list)):
+        #     if k_largest_sum_coefs[i] == 0:
+        #         alphas[i] = 0
+        #         betas[i] = 0
+        
+        # self.largest_alphas = alphas
+        # self.largest_betas = betas
+        # self.k_largest_sum_coefs = k_largest_sum_coefs
+        
+        """choose k largest coefficients from alphas and betas seperately
+        """
+        
+        n = self.X.shape[1] # number of observations
+        k_largest_coefs_list = []
+        combined_coefs_vector = np.concatenate((alphas, betas))
+        # print(combined_coefs_vector)
+        for i in range(k):
+            index = np.argmax(combined_coefs_vector)
+            print(index, " and the value is  :", combined_coefs_vector[index])
+            k_largest_coefs_list.append((index, combined_coefs_vector[index]))
+            combined_coefs_vector[index] = 0
+        
+        k_largest_coefs_vector = np.zeros(n)
+        for i, v in k_largest_coefs_list:
+            if i > n-1:
+                k_largest_coefs_vector[i-n] = v
+            else:
+                k_largest_coefs_vector[i] = v
+        self.k_largest_sum_coefs = k_largest_coefs_vector
+        print(self.k_largest_sum_coefs)
 
     def class_coefs_vect(self):
         
@@ -141,6 +172,7 @@ class polynomial_EkNN_R:
                     class_coefs_vect[i, j] = self.k_largest_sum_coefs[j]
                 else:
                     class_coefs_vect[i, i] = 0
+        print("class_ceof_vect: ", class_coefs_vect)
                     
         # class_betas_vect = np.zeros((len(self.x_labels_encode.shape[0]), self.X.shape[1]))
         
@@ -184,6 +216,7 @@ class polynomial_EkNN_R:
     
     def classify(self):
         class_coefs_vect = self.class_coefs_vect()
+        # print(class_coefs_vect)
         weights_coefs_product = class_coefs_vect @ self.weights()
         # print(weights_coefs_product, weights_coefs_product.shape)
         return np.where(weights_coefs_product == max(weights_coefs_product))[0][0]
@@ -262,13 +295,14 @@ class polynomial_EkNN_R_classifier(BaseEstimator, ClassifierMixin):
             alphas_0 = np.linalg.pinv(self.X_train) @ y_s[i]
             betas_0 = (np.linalg.pinv(self.X_train) ** 2) @ y_s[i]
             x0 = np.concatenate((alphas_0, betas_0), axis=0)
-            # print(x0)
+            print("x0 is:" ,x0)
             reg = polynomial_reg(self.X_train, y_s[i], self.group_vect, self.lambda_)
             coefs = reg.lasso_optimize(x0).x
             # print(reg.lasso_optimize(xL2).message)
-            # print(coefs)
+            print("The init coefs: ", coefs)
             poly_EkNN_R = polynomial_EkNN_R(self.X_train, y_s[i], coefs[0:self.X_train.shape[1]], coefs[self.X_train.shape[1]:], self.y_train, self.k)
             preds[i] = poly_EkNN_R.classify()
+            print( i ,"th prediction :", preds[i])
 
         return preds
         
