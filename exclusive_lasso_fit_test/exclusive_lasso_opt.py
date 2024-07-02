@@ -18,16 +18,13 @@ class coordinateDescentFit:
     def coord_descent(self):
         prev_alphas = np.zeros(self.X.shape[1])
         alphas = self.alphas_0
-        # print("very first alpha: ", alphas[0])
 
         n = self.X.shape[1] # number of observations
         X_T = np.transpose(self.X) # nxp matrix
 
         while np.linalg.norm(alphas - prev_alphas, ord=1) > self.step_size:
-        # for i in range()    
-            # print(self.group_matrix)
             prev_alphas = alphas.copy()
-            # print("initial alpha is: ",prev_alphas)
+
             for j in range(n): # update each of n coefficients sequentially
                 if j == n-1:
                     X_l = self.X[:,:j]
@@ -48,13 +45,11 @@ class coordinateDescentFit:
 
 
                 tilde_lambda_ *= self.lambda_ 
-                # print("tilde lambda: ", tilde_lambda_)
+
                 x1 = tilde_z / (X_T[j] @ np.transpose(X_T[j]) + self.lambda_)
-                # print("x1 is: ", x1)
                 x2 = tilde_lambda_ / (X_T[j] @ np.transpose(X_T[j]) + self.lambda_)
                 alphas_j = self.threshold(x1, x2)
                 alphas[j] = alphas_j
                 print(prev_alphas[j], alphas[j])
-            # print("l1 norm of difference: ", np.linalg.norm(alphas - prev_alphas, ord=1))
             
         return alphas
