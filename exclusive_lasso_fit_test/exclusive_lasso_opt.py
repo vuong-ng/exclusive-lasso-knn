@@ -12,7 +12,8 @@ class coordinateDescentFit:
  
     def threshold(self, x1, x2): # S(x, lambda_) = sign(x)(|x| - lambda_)
         sgn = -1 if x1 < 0 else 1
-        return sgn * (abs(x1) - x2) if x1 > 0 else 0
+        res = (abs(x1) - x2) if (abs(x1) - x2) > 0 else 0
+        return sgn * res 
 
     def coord_descent(self):
         prev_alphas = np.zeros(self.X.shape[1])
