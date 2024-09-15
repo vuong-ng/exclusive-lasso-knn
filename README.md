@@ -10,4 +10,6 @@ My research focused on generalizing the Exclusive Lasso-based K-nearest-neighbor
 
 ## Overall research methods:
 - Please refer to the research poster for research summary and results.
+
+
 <a href="research_poster (1).pdf" class="image fit"><img src="research_poster.png" alt=""></a>
